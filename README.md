@@ -20,11 +20,10 @@ for downstream behavioral and statistical analyses.
 
 ## References
 
-Details of the IntelliProfiler workflow are described in the following preprint:
-
-**IntelliProfiler 2.0: A high-throughput R-based pipeline for behavioral analysis  
-of group-housed mice tracked with a high-resolution RFID system**  
-*(bioRxiv, 2025)*
+Details of the IntelliProfiler workflow are described in the following preprint:  
+**IntelliProfiler: a research workflow for analyzing multiple animals with a high-resolution home-cage RFID system** 
+*(bioRxiv, 2025, Lab Animal in press)*  
+https://www.biorxiv.org/content/10.1101/2024.10.23.619967v3.full
 
 ---
 
@@ -91,7 +90,7 @@ IntelliProfiler2.0/
 ├─ results/
 │ └─ example/ # example outputs (Excel, figures)
 │ 
-├─ config/ # optional configuration files
+├─ config/    # optional configuration files
 │ 
 └─ README.md
 ```
