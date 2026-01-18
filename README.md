@@ -1,4 +1,6 @@
 # IntelliProfiler 2.0  
+<img src="images/logo.png" width="200">
+
 ### A research workflow for multi-animal behavioral analysis using R
 
 This repository provides the source code for **IntelliProfiler 2.0**,  
@@ -18,7 +20,7 @@ for downstream behavioral and statistical analyses.
 
 ---
 
-## References
+## 📚References
 
 Details of the IntelliProfiler workflow are described in the following preprint:  
 **IntelliProfiler: a research workflow for analyzing multiple animals with a high-resolution home-cage RFID system** 
@@ -27,7 +29,7 @@ https://www.biorxiv.org/content/10.1101/2024.10.23.619967v3.full
 
 ---
 
-## Overview of the Workflow
+## ⚙️Overview of the Workflow
 
 IntelliProfiler 2.0 is conceptually divided into two stages:
 
@@ -60,7 +62,7 @@ The Analysis stage produces figures and aggregated summary tables as final outpu
 
 ---
 
-## Prerequisites
+## 🧩Prerequisites
 
 The following R packages are required to run the core scripts:
 
@@ -72,17 +74,12 @@ Additional packages may be required depending on the selected analysis modules.
 
 ---
 
-## Directory Structure
+## 🗂️Directory Structure
 ```text
 IntelliProfiler2.0/
 ├─ scripts/
-│ │ 
 │ ├─ general/ # preprocessing and core feature extraction
-│ │ └─ IP_general.R
-│ │ 
 │ └─ analysis/ # downstream analysis modules
-│    ├─ social_distance.R
-│    └─ group_compare.R
 │ 
 ├─ data/
 │ └─ example/ # example RFID log files
@@ -90,15 +87,16 @@ IntelliProfiler2.0/
 ├─ results/
 │ └─ example/ # example outputs (Excel, figures)
 │ 
-├─ config/    # optional configuration files
-│ 
+├─ images/     #figures used in README
+├─ LICENSE
+├─ .gitignore
 └─ README.md
 ```
 
 ---
-## Future Citation
+## 📝Citation
 Once published, please cite: **Ochi S#, Azuma M#, Hara I, Inada H, Takabayashi K, Osumi N  IntelliProfiler 2.0: A high-throughput R-based pipeline for behavioral analysis of group-housed mice tracked with a high-resolution RFID system ''
  
 ---
-## License
+## 📜License
 This project is licensed under the MIT License see the LICENSE file for details
