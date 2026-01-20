@@ -40,6 +40,12 @@ The following R packages are required to run the core scripts:
 Additional packages may be required depending on the selected modules.
 
 ---
+## ⚠️ Large files and Git LFS 
+This repository contains large example data files that are managed using**Git Large File Storage (Git LFS)**.  
+When cloning or pushing this repository—especially from a remote server—
+please ensure that Git LFS is installed and properly configured in your environment.
+
+---
 
 ## 🗂️Directory Structure
 ```text
