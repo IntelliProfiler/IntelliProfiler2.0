@@ -1,36 +1,66 @@
 # --- Required packages ---
-library(readxl)
-library(stringr)
-library(dplyr)
-library(ggplot2)
-library(emmeans)
-library(tidyr)
-library(stringr)
+suppressPackageStartupMessages({
+  library(readxl)
+  library(stringr)
+  library(dplyr)
+  library(ggplot2)
+  library(emmeans)
+  library(tidyr)
+  library(purrr)
+})
 
 # --- Interactive file selection ---
 cat("▶ Please select the Male file\n")
 file1 <- file.choose()
+cat("▶ Selected Male file:", file1, "\n")
+
 cat("▶ Please select the Female file\n")
 file2 <- file.choose()
+cat("▶ Selected Female file:", file2, "\n")
+
 group1_name <- "Male"
 group2_name <- "Female"
 
 # --- Base output folder (same location as the Male file) ---
 out_dir <- file.path(dirname(file1), "Group_Comparison_Results")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+message("▶ Output folder: ", out_dir)
 
 # --- Load data and assign group labels ---
 read_group_data <- function(file, group_name) {
   read_excel(file) %>%
     mutate(
       Group = group_name,
-      Pair = paste(ID_1, ID_2, sep = "-")   # ★ create the Pair column
+      Pair  = paste(ID_1, ID_2, sep = "-")   # create the Pair column
     )
 }
 
 data1 <- read_group_data(file1, group1_name)
 data2 <- read_group_data(file2, group2_name)
 data_all <- bind_rows(data1, data2)
+
+# ============================================================
+# FIX 1) Column name mismatch (CCR vs Close_Contact_Ratio)
+#   - Keep downstream code unchanged by creating an alias column
+# ============================================================
+fix_ccr_col <- function(df) {
+  # If Close_Contact_Ratio missing but CCR exists, create alias
+  if (!("Close_Contact_Ratio" %in% names(df)) && ("CCR" %in% names(df))) {
+    df <- df %>% mutate(Close_Contact_Ratio = as.numeric(CCR))
+  }
+  # If still missing, stop with clear message
+  if (!("Close_Contact_Ratio" %in% names(df))) {
+    stop(
+      "Required CCR column not found. Expected either 'Close_Contact_Ratio' or 'CCR'.\n",
+      "Found columns: ", paste(names(df), collapse = ", ")
+    )
+  }
+  # Ensure numeric (Excel sometimes imports as text)
+  df <- df %>% mutate(Close_Contact_Ratio = as.numeric(Close_Contact_Ratio))
+  df
+}
+
+data_all <- fix_ccr_col(data_all)
 
 # ★★★ Fix Group order: Male → Female ★★★
 data_all <- data_all %>%
@@ -45,12 +75,12 @@ data_all <- data_all %>%
     ZT_Display = factor(ZT_Display, levels = unique(ZT_Display))
   )
 
-# --- Compute group-wise summary statistics ---
+# --- Compute group-wise means ---
 summary_data <- data_all %>%
   group_by(Group, ZT_Display, ZT, Day) %>%
   summarise(
-    Avg_ID = mean(Avg_InterIndividual_Distance),
-    SD_ID  = sd(Avg_InterIndividual_Distance),
+    Avg_Distance = mean(Close_Contact_Ratio, na.rm = TRUE),
+    SD           = sd(Close_Contact_Ratio, na.rm = TRUE),
     .groups = "drop"
   )
 
@@ -62,7 +92,7 @@ zt_levels <- levels(data_all$ZT_Display)
 for (zt in zt_levels) {
   dat <- filter(data_all, ZT_Display == zt)
   if (n_distinct(dat$Group) == 2) {
-    model <- tryCatch(aov(Avg_InterIndividual_Distance ~ Group, data = dat), error = function(e) NULL)
+    model <- tryCatch(aov(Close_Contact_Ratio ~ Group, data = dat), error = function(e) NULL)
     if (!is.null(model)) {
       pval <- summary(model)[[1]][["Pr(>F)"]][1]
       anova_hourly_list[[zt]] <- data.frame(ZT_Display = zt, p = pval)
@@ -77,8 +107,8 @@ for (zt in zt_levels) {
 anova_hourly <- bind_rows(anova_hourly_list) %>%
   mutate(sig_label = case_when(
     p < 0.001 ~ "***",
-    p < 0.01 ~ "**",
-    p < 0.05 ~ "*",
+    p < 0.01  ~ "**",
+    p < 0.05  ~ "*",
     TRUE ~ ""
   ))
 
@@ -106,36 +136,33 @@ display_labels <- summary_data %>%
   pull(ZT_Display) %>%
   unique()
 
-# --- Global y-axis max (to align asterisk positions) ---
-global_max <- max(data_all$Avg_InterIndividual_Distance, na.rm = TRUE)
-y_max   <- global_max * 1.1
-y_limit <- global_max * 1.2
-
 # --- Color settings ---
 color_values <- setNames(c("#377EB8", "#E41A1C"), c(group1_name, group2_name))
 
-# --- Max Avg_ID for each ZT_Display --- 
+# --- Max Avg_Distance for each ZT_Display ---
 zt_max_values <- summary_data %>%
   group_by(ZT_Display) %>%
-  summarise(max_y = max(Avg_ID), .groups = "drop")
+  summarise(max_y = max(Avg_Distance, na.rm = TRUE), .groups = "drop")
 
 # --- Build colored asterisk annotation data ---
 sig_stars <- anova_hourly %>%
   filter(sig_label != "") %>%
   left_join(tukey_hourly_df, by = "ZT_Display") %>%
-  filter(p.value < 0.05) %>%
+  filter(!is.na(p.value), p.value < 0.05) %>%
   mutate(
-    winner = ifelse(estimate > 0,
-                    str_extract(contrast, ".*(?= - )"),
-                    str_extract(contrast, "(?<= - ).*")),
+    winner = ifelse(
+      estimate > 0,
+      str_extract(contrast, ".*(?= - )"),
+      str_extract(contrast, "(?<= - ).*")
+    ),
     label_color = color_values[winner],
-    sig_label = sig_label.x    # ★★★ use sig_label from anova_hourly ★★★
+    sig_label = sig_label.x
   ) %>%
   left_join(zt_max_values, by = "ZT_Display") %>%
-  mutate(y_pos = max_y + 5)
+  mutate(y_pos = max_y + 10)
 
-# --- Create plot ---
-p_group <- ggplot(summary_data, aes(x = ZT_Display, y = Avg_ID, color = Group, group = Group)) +
+# --- Create plot (1hr) ---
+p_group <- ggplot(summary_data, aes(x = ZT_Display, y = Avg_Distance, color = Group, group = Group)) +
   geom_rect(
     data = grey_blocks,
     aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
@@ -143,11 +170,12 @@ p_group <- ggplot(summary_data, aes(x = ZT_Display, y = Avg_ID, color = Group, g
   ) +
   geom_line(linewidth = 1) +
   geom_point(size = 1.5) +
-  geom_ribbon(aes(ymin = Avg_ID - SD_ID, ymax = Avg_ID + SD_ID, fill = Group), alpha = 0.2, color = NA) +
+  geom_ribbon(aes(ymin = Avg_Distance - SD, ymax = Avg_Distance + SD, fill = Group),
+              alpha = 0.2, color = NA) +
   scale_x_discrete(breaks = display_labels) +
   scale_color_manual(values = color_values) +
   scale_fill_manual(values = color_values) +
-  scale_y_continuous(limits = c(0, 40)) +
+  scale_y_continuous(limits = c(0, 100)) +
   geom_text(
     data = sig_stars,
     aes(x = ZT_Display, y = y_pos, label = sig_label),
@@ -156,43 +184,34 @@ p_group <- ggplot(summary_data, aes(x = ZT_Display, y = Avg_ID, color = Group, g
     fontface = "bold"
   ) +
   labs(
-    title = "Inter-individual distance - group comparison",
-    x = "Day and ZT",
-    y = "Average inter-individual distance (cm)",
-    color = "Group"
+    title = "Close contact ratio - group comparison",
+    x = "Day and ZT", y = "Close contact ratio (%)", color = "Group"
   ) +
   theme_minimal(base_size = 14) +
   theme(
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
     legend.position = "right",
-    plot.background  = element_rect(fill = "transparent", color = NA),
-    panel.background = element_rect(fill = "transparent", color = NA),
+    plot.background   = element_rect(fill = "transparent", color = NA),
+    panel.background  = element_rect(fill = "transparent", color = NA),
     legend.background = element_rect(fill = "transparent", color = NA),
     axis.title.x = element_text(size = 14, face = "bold"),
     axis.title.y = element_text(size = 14, face = "bold")
   )
 
-# PNG (transparent background)
-ggsave(
-  file.path(out_dir, paste0("HourlyID_GroupComparison_", Sys.Date(), ".png")),
-  p_group, width = 10, height = 4, dpi = 300, bg = "transparent"
-)
-
-# PDF (transparent background)
-ggsave(
-  file.path(out_dir, paste0("HourlyID_GroupComparison_", Sys.Date(), ".pdf")),
-  p_group, width = 10, height = 4, bg = "transparent"
-)
+# --- Save outputs (1hr) ---
+ggsave(file.path(out_dir, paste0("HourlyCCR_GroupComparison_", Sys.Date(), ".png")),
+       p_group, width = 10, height = 4, dpi = 300, bg = "transparent")
+ggsave(file.path(out_dir, paste0("HourlyCCR_GroupComparison_", Sys.Date(), ".pdf")),
+       p_group, width = 10, height = 4, bg = "transparent")
 
 write.csv(anova_hourly, file.path(out_dir, paste0("ANOVA_Hourly_byZT_", Sys.Date(), ".csv")), row.names = FALSE)
 write.csv(tukey_hourly_df, file.path(out_dir, paste0("Tukey_Hourly_byZT_", Sys.Date(), ".csv")), row.names = FALSE)
 
-message("Save completed: ", out_dir)
+message("✅ Save completed (1hr): ", out_dir)
 
 # --- Global model (1hr) ---
-model_global_1hr <- aov(Avg_InterIndividual_Distance ~ Group * ZT_Display, data = data_all)
+model_global_1hr <- aov(Close_Contact_Ratio ~ Group * ZT_Display, data = data_all)
 
-# Convert ANOVA table to a data frame
 anova_global_1hr_df <- as.data.frame(summary(model_global_1hr)[[1]])
 anova_global_1hr_df$Effect <- rownames(anova_global_1hr_df)
 colnames(anova_global_1hr_df)[which(colnames(anova_global_1hr_df) == "Pr(>F)")] <- "p_value"
@@ -206,8 +225,11 @@ anova_global_1hr_df <- anova_global_1hr_df %>%
     TRUE ~ ""
   ))
 
-# Save
 write.csv(anova_global_1hr_df, file.path(out_dir, paste0("ANOVA_Global_1hr_", Sys.Date(), ".csv")), row.names = FALSE)
+
+# ============================================================
+# 12h (Light/Dark) summary + stats
+# ============================================================
 
 # --- Add Light/Dark info + create Period_Label ---
 data_all_sum12h <- data_all %>%
@@ -233,22 +255,20 @@ data_all_sum12h <- data_all_sum12h %>%
 summary_data_12h <- data_all_sum12h %>%
   group_by(Group, Period_Label, Index) %>%
   summarise(
-    Avg_ID = mean(Avg_InterIndividual_Distance),
-    SD_ID  = sd(Avg_InterIndividual_Distance),
+    Avg_CCR = mean(Close_Contact_Ratio, na.rm = TRUE),
+    SD      = sd(Close_Contact_Ratio, na.rm = TRUE),
     .groups = "drop"
   )
 
-# --- Background data for grey shading ---
+# --- Background data for grey shading (Dark only) ---
 bg_blocks_12h <- data_all_sum12h %>%
   distinct(Index, Period_Label, LightDark) %>%
   mutate(LightDarkColor = ifelse(LightDark == "Light", "white", "grey80"))
 
-# --- Define night-phase blocks (only LightDark == "Dark") ---
 grey_blocks_12h <- data_all_sum12h %>%
   filter(LightDark == "Dark") %>%
   distinct(Index, Period_Label) %>%
-  mutate(xmin = Index - 0.5,
-         xmax = Index + 0.5)
+  mutate(xmin = Index - 0.5, xmax = Index + 0.5)
 
 # --- ANOVA + Tukey (for each Period_Label) ---
 tukey_12h_list <- list()
@@ -259,7 +279,7 @@ period_levels <- levels(data_all_sum12h$Period_Label)
 for (period in period_levels) {
   dat <- filter(data_all_sum12h, Period_Label == period)
   if (n_distinct(dat$Group) == 2) {
-    model <- tryCatch(aov(Avg_InterIndividual_Distance ~ Group, data = dat), error = function(e) NULL)
+    model <- tryCatch(aov(Close_Contact_Ratio ~ Group, data = dat), error = function(e) NULL)
     if (!is.null(model)) {
       pval <- summary(model)[[1]][["Pr(>F)"]][1]
       anova_12h_list[[period]] <- data.frame(Period_Label = period, p = pval)
@@ -274,8 +294,8 @@ for (period in period_levels) {
 anova_12h <- bind_rows(anova_12h_list) %>%
   mutate(sig_label = case_when(
     p < 0.001 ~ "***",
-    p < 0.01 ~ "**",
-    p < 0.05 ~ "*",
+    p < 0.01  ~ "**",
+    p < 0.05  ~ "*",
     TRUE ~ ""
   ))
 
@@ -290,22 +310,24 @@ tukey_12h_df <- bind_rows(tukey_12h_list) %>%
 # --- Asterisk positions ---
 period_max_values <- summary_data_12h %>%
   group_by(Period_Label) %>%
-  summarise(max_y = max(Avg_ID), .groups = "drop")
+  summarise(max_y = max(Avg_CCR, na.rm = TRUE), .groups = "drop")
 
 sig_stars_12h <- anova_12h %>%
   filter(sig_label != "") %>%
   left_join(tukey_12h_df, by = "Period_Label") %>%
-  filter(p.value < 0.05) %>%
+  filter(!is.na(p.value), p.value < 0.05) %>%
   mutate(
-    winner = ifelse(estimate > 0,
-                    str_extract(contrast, ".*(?= - )"),
-                    str_extract(contrast, "(?<= - ).*")),
+    winner = ifelse(
+      estimate > 0,
+      str_extract(contrast, ".*(?= - )"),
+      str_extract(contrast, "(?<= - ).*")
+    ),
     label_color = color_values[winner],
-    sig_label = sig_label.x 
+    sig_label = sig_label.x
   ) %>%
   left_join(period_max_values, by = "Period_Label") %>%
   left_join(bg_blocks_12h, by = "Period_Label") %>%
-  mutate(y_pos = max_y + 10)
+  mutate(y_pos = max_y + 30)
 
 # --- Helper function to convert x-axis labels ---
 label_fix <- function(x) {
@@ -315,34 +337,23 @@ label_fix <- function(x) {
 }
 
 # --- 12h cumulative plot ---
-p_sum12h <- ggplot(summary_data_12h, aes(x = Index, y = Avg_ID, color = Group, group = Group)) +
-  
-  # Background shading (Light/Dark)
+p_sum12h <- ggplot(summary_data_12h, aes(x = Index, y = Avg_CCR, color = Group, group = Group)) +
   geom_rect(
     data = grey_blocks_12h,
     aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
     fill = "grey80", alpha = 0.5, inherit.aes = FALSE
   ) +
-  
-  # Main lines and points
   geom_line(linewidth = 1) +
   geom_point(size = 1.5) +
-  
-  # Ribbon (match 1hr styling: group-colored ribbon)
-  geom_ribbon(aes(ymin = Avg_ID - SD_ID, ymax = Avg_ID + SD_ID, fill = Group), alpha = 0.2, color = NA) +
-  
-  # Color settings
+  geom_ribbon(aes(ymin = Avg_CCR - SD, ymax = Avg_CCR + SD, fill = Group),
+              alpha = 0.2, color = NA) +
   scale_color_manual(values = color_values) +
   scale_fill_manual(values = color_values) +
-  
-  # Axes
-  scale_y_continuous(limits = c(0, 40)) +
+  scale_y_continuous(limits = c(0, 100)) +
   scale_x_continuous(
     breaks = bg_blocks_12h$Index,
     labels = label_fix(bg_blocks_12h$Period_Label)
   ) +
-  
-  # Asterisks
   geom_text(
     data = sig_stars_12h,
     aes(x = Index, y = y_pos, label = sig_label),
@@ -350,46 +361,33 @@ p_sum12h <- ggplot(summary_data_12h, aes(x = Index, y = Avg_ID, color = Group, g
     show.legend = FALSE, inherit.aes = FALSE, size = 8,
     fontface = "bold"
   ) +
-  
-  # Labels and theme
   labs(
-    title = "Inter-individual distance - group comparison",
-    x = "",
-    y = "Average inter-individual distance (cm)",
-    color = "Group"
+    title = "Close contact ratio - group comparison",
+    x = "", y = "Close contact ratio (%)", color = "Group"
   ) +
   theme_minimal(base_size = 14) +
   theme(
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
     legend.position = "right",
-    plot.background  = element_rect(fill = "transparent", color = NA),
-    panel.background = element_rect(fill = "transparent", color = NA),
+    plot.background   = element_rect(fill = "transparent", color = NA),
+    panel.background  = element_rect(fill = "transparent", color = NA),
     legend.background = element_rect(fill = "transparent", color = NA),
     axis.title.x = element_text(size = 14, face = "bold"),
     axis.title.y = element_text(size = 14, face = "bold")
   )
 
-# --- Save outputs ---
-# PNG (transparent background)
-ggsave(
-  file.path(out_dir, paste0("Ave12h_IDGroupComparison_", Sys.Date(), ".png")),
-  p_sum12h, width = 10, height = 4, dpi = 300, bg = "transparent"
-)
+# --- Save outputs (12h) ---
+ggsave(file.path(out_dir, paste0("Average12h_CCRGroupComparison_", Sys.Date(), ".png")),
+       p_sum12h, width = 10, height = 4, dpi = 300, bg = "transparent")
+ggsave(file.path(out_dir, paste0("Average12h_CCRGroupComparison_", Sys.Date(), ".pdf")),
+       p_sum12h, width = 10, height = 4, bg = "transparent")
 
-# PDF (transparent background)
-ggsave(
-  file.path(out_dir, paste0("Ave12h_IDGroupComparison_", Sys.Date(), ".pdf")),
-  p_sum12h, width = 10, height = 4, bg = "transparent"
-)
-
-# --- Save 12h ANOVA / Tukey results
 write.csv(anova_12h, file.path(out_dir, paste0("ANOVA_Sum12h_byPeriod_", Sys.Date(), ".csv")), row.names = FALSE)
 write.csv(tukey_12h_df, file.path(out_dir, paste0("Tukey_Sum12h_byPeriod_", Sys.Date(), ".csv")), row.names = FALSE)
 
 # --- Global model (12hr) ---
-model_global_12h <- aov(Avg_InterIndividual_Distance ~ Group * Period_Label, data = data_all_sum12h)
+model_global_12h <- aov(Close_Contact_Ratio ~ Group * Period_Label, data = data_all_sum12h)
 
-# Convert ANOVA table to a data frame
 anova_global_12h_df <- as.data.frame(summary(model_global_12h)[[1]])
 anova_global_12h_df$Effect <- rownames(anova_global_12h_df)
 colnames(anova_global_12h_df)[which(colnames(anova_global_12h_df) == "Pr(>F)")] <- "p_value"
@@ -403,5 +401,6 @@ anova_global_12h_df <- anova_global_12h_df %>%
     TRUE ~ ""
   ))
 
-# Save
 write.csv(anova_global_12h_df, file.path(out_dir, paste0("ANOVA_Global_12hr_", Sys.Date(), ".csv")), row.names = FALSE)
+
+message("✅ Save completed (12h): ", out_dir)
