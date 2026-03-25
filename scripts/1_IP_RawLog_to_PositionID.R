@@ -43,16 +43,16 @@ import_IP1_data <- function(filePaths, positions) {
 }
 
 # --- B. Load data (interactive file selection) ---
-cat("▶ Please select the TeraTerm log file for Board 1.\n")
+cat("▶ Please select the TeraTerm log file for com15.\n")
 f1 <- file.choose()
 
-cat("▶ Please select the TeraTerm log file for Board 2.\n")
+cat("▶ Please select the TeraTerm log file for com18.\n")
 f2 <- file.choose()
 
-cat("▶ Please select the TeraTerm log file for Board 3.\n")
+cat("▶ Please select the TeraTerm log file for com16.\n")
 f3 <- file.choose()
 
-cat("▶ Please select the TeraTerm log file for Board 4.\n")
+cat("▶ Please select the TeraTerm log file for com17.\n")
 f4 <- file.choose()
 
 filePaths <- c(f1, f2, f3, f4)

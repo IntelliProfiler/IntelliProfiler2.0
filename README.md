@@ -66,7 +66,10 @@ IntelliProfiler2.0/
 
 ---
 ## 📝Citation
-Once published, please cite: **Ochi S#, Azuma M#, Hara I, Inada H, Takabayashi K, Osumi N  IntelliProfiler 2.0: A high-throughput R-based pipeline for behavioral analysis of group-housed mice tracked with a high-resolution RFID system ''
+If you use IntelliProfiler 2.0 in your research, please cite:  
+Ochi S#, Azuma M#, Hara I, Inada H, Takabayashi K, Osumi N  
+IntelliProfiler 2.0: An integrated R pipeline for long-term home-cage behavioral profiling in group-housed mice using eeeHive 2D (bioRxiv, 2026)
+https://www.biorxiv.org/content/10.64898/2026.02.10.705044v1
  
 ---
 ## 📜License

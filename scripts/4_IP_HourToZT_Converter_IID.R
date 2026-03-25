@@ -5,7 +5,7 @@ library(lubridate)
 library(writexl)
 
 # --- Interactive file selection ---
-cat("▶ Please select the file (Hourly_IV.xlsx)\n")
+cat("▶ Please select the file (Hourly_IID.xlsx)\n")
 file_path <- file.choose()
 cat("▶ Selected file:", file_path, "\n")
 
@@ -36,7 +36,7 @@ output <- data %>%
 output_dir <- dirname(file_path)
 
 # --- Output file name ---
-output_file <- file.path(output_dir, "ZT_converted_IV.xlsx")
+output_file <- file.path(output_dir, "ZT_converted_IID.xlsx")
 
 # --- Save result ---
 write_xlsx(output, path = output_file)

@@ -94,8 +94,8 @@ for (i in 1:(length(ids) - 1)) {
   }
 }
 
-Hourly_IV <- bind_rows(pairwise_list)
-write_xlsx(Hourly_IV, file.path(out_dir, "Hourly_IV.xlsx"))
+Hourly_IID <- bind_rows(pairwise_list)
+write_xlsx(Hourly_IID, file.path(out_dir, "Hourly_IID.xlsx"))
 
 # --- 4. Close Contact Ratio (CCR) calculation ---
 pairwise_ccr_list <- list()
@@ -138,11 +138,11 @@ p_move <- ggplot(hourly_movement, aes(Hour, Total_Distance, color = ID)) +
 save_plot("movement_hour", p_move)
 
 ## 5.2 Inter-individual distance
-p_iv <- ggplot(Hourly_IV, aes(Hour, Avg_Inter_Individual_Distance,
+p_iid <- ggplot(Hourly_IID, aes(Hour, Avg_Inter_Individual_Distance,
                               color = interaction(ID_1, ID_2))) +
   geom_line(alpha = 0.7) + theme_minimal() +
   labs(title = "Hourly Inter-Individual Distance", y = "Distance (cm)")
-save_plot("inter-individual_distance_hour", p_iv, 12, 8)
+save_plot("inter-individual_distance_hour", p_iid, 12, 8)
 
 ## 5.3 CCR
 p_ccr <- ggplot(CCR, aes(Hour, CCR, color = interaction(ID_1, ID_2))) +
