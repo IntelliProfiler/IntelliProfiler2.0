@@ -1,3 +1,11 @@
+###########################################
+# Script name : 05_IP_HourToZT_Converter_CCR.R
+# Description : Convert hourly close contact ratio (CCR) data into Zeitgeber Time (ZT) format
+# Authors     : Shohei Ochi, Masashi Azuma
+# Version history:
+#   v1.1 - 2025-01-20 - Shohei Ochi, Masashi Azuma
+#   v1.2 - 2026-03-31 - Shohei Ochi, Masashi Azuma
+###########################################
 # --- Required libraries ---
 library(readxl)
 library(dplyr)
@@ -16,8 +24,8 @@ data <- read_excel(file_path)
 data <- data %>%
   mutate(Hour = as.POSIXct(Hour, tz = "UTC"))
 
-# --- Define ZT0 reference time ---
-zt0 <- as.POSIXct("2025-05-24 08:00:00", tz = "UTC")  # Change if necessary
+# --- Define ZT0 reference time (08:00 of the first recording day) ---
+zt0 <- floor_date(min(data$Hour), "day") + hours(8)
 
 # --- Add ZT labels ---
 data <- data %>%
@@ -27,9 +35,6 @@ data <- data %>%
     ZT_Label = paste0("Day", ZT_Day, " ZT", ZT_Hour %% 24)
   )
 
-# --- Extract and reorder necessary columns ---
-# Expecting: Hour, ID_1, ID_2, CCR (or Close_Contact_Ratio)
-# If your column is named "CCR", this works as-is.
 output <- data %>%
   select(ID_1, ID_2, ZT_Label, CCR)
 
@@ -37,7 +42,7 @@ output <- data %>%
 output_dir <- dirname(file_path)
 
 # --- Output file name ---
-output_file <- file.path(output_dir, "ZT_converted_CCR.xlsx")
+output_file <- file.path(output_dir, "ZT_converted_Hourly_CCR.xlsx")
 
 # --- Save result ---
 write_xlsx(output, path = output_file)

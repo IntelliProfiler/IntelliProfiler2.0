@@ -1,3 +1,11 @@
+###########################################
+# Script name : 03_IP_HourToZT_Converter_TD.R
+# Description : Convert hourly travel distance (TD) data into Zeitgeber Time (ZT) format
+# Authors     : Shohei Ochi, Masashi Azuma
+# Version history:
+#   v1.1 - 2025-01-20 - Shohei Ochi, Masashi Azuma
+#   v1.2 - 2026-03-31 - Shohei Ochi, Masashi Azuma
+###########################################
 # --- Required libraries ---
 library(readxl)
 library(dplyr)
@@ -5,7 +13,7 @@ library(lubridate)
 library(writexl)
 
 # --- Interactive file selection ---
-cat("▶ Please select the file (Hourly_Movement.xlsx)\n")
+cat("▶ Please select the file (Hourly_TD.xlsx)\n")
 file_path <- file.choose()
 cat("▶ Selected file:", file_path, "\n")
 
@@ -16,10 +24,9 @@ data <- read_excel(file_path)
 data <- data %>%
   mutate(Hour = as.POSIXct(Hour, tz = "UTC"))
 
-# --- Define ZT0 reference time ---
-zt0 <- as.POSIXct("2025-05-24 08:00:00", tz = "UTC")  # Change if necessary
+# --- Define ZT0 reference time (08:00 of the first recording day) ---
+zt0 <- floor_date(min(data$Hour), "day") + hours(8)
 
-# --- Add ZT labels ---
 data <- data %>%
   mutate(
     ZT_Hour = as.numeric(difftime(Hour, zt0, units = "hours")),
@@ -27,7 +34,6 @@ data <- data %>%
     ZT_Label = paste0("Day", ZT_Day, " ZT", ZT_Hour %% 24)
   )
 
-# --- Extract and reorder necessary columns ---
 output <- data %>%
   select(ID, ZT_Label, Total_Distance)
 
@@ -35,7 +41,7 @@ output <- data %>%
 output_dir <- dirname(file_path)
 
 # --- Output file name ---
-output_file <- file.path(output_dir, "ZT_converted_HM.xlsx")
+output_file <- file.path(output_dir, "ZT_converted_Hourly_TD.xlsx")
 
 # --- Save result ---
 write_xlsx(output, path = output_file)
