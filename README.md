@@ -20,15 +20,6 @@ for downstream behavioral and statistical analyses.
 
 ---
 
-## 📚References
-
-Details of the IntelliProfiler workflow are described in the following article:  
-**IntelliProfiler: a research workflow for analyzing multiple animals with a high-resolution home-cage RFID system** 
-*(Ochi et al., 2026, Lab Animal)*  
-https://www.nature.com/articles/s41684-025-01668-4
-
----
-
 ## 🧩Prerequisites
 
 The following R packages are required to run the core scripts:
@@ -66,10 +57,18 @@ IntelliProfiler2.0/
 
 ---
 ## 📝Citation
-If you use IntelliProfiler 2.0 in your research, please cite:  
+If you use IntelliProfiler 2.0 in your research, please cite:
+### IntelliProfiler 2.0 (current version)
 Ochi S#, Azuma M#, Hara I, Inada H, Takabayashi K, Osumi N  
-IntelliProfiler 2.0: An integrated R pipeline for long-term home-cage behavioral profiling in group-housed mice using eeeHive 2D (bioRxiv, 2026)
+IntelliProfiler 2.0: An integrated R pipeline for long-term home-cage behavioral profiling in group-housed mice using eeeHive 2D  
+bioRxiv (2026)  
 https://www.biorxiv.org/content/10.64898/2026.02.10.705044v1
+
+### Previous version (IntelliProfiler 1.0)
+Ochi S et al.  
+IntelliProfiler: a research workflow for analyzing multiple animals with a high-resolution home-cage RFID system  
+Lab Animal (2026)  
+https://www.nature.com/articles/s41684-025-01668-4
  
 ---
 ## 📜License
