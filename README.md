@@ -3,12 +3,12 @@
 
 ### A research workflow for multi-animal behavioral analysis using R
 
-This repository provides the source code for **IntelliProfiler 2.0**,  
-a research-oriented workflow implemented in R for analyzing locomotor activity
-and social proximity in group-housed mice.
+This repository provides the source code for **IntelliProfiler 2.0**,
+an integrated R-based workflow for analyzing locomotor activity, inter-individual distance, 
+and social proximity in group-housed mice using high-resolution RFID tracking data.
 
 IntelliProfiler processes positional data acquired from a commercially available
-high-resolution RFID floor plate (eeeHive2D, Phenovance LLC, Japan; Lipp et al., 2024).
+high-resolution RFID floor plate (eeeHive 2D, Phenovance LLC, Japan; Lipp et al., 2024).
 The workflow generates automated, quantitative behavioral metrics and visualizations
 for downstream behavioral and statistical analyses.
 
@@ -41,7 +41,7 @@ Additional packages may be required depending on the selected modules.
 
 ---
 ## ⚠️ Large files and Git LFS 
-This repository contains large example data files that are managed using**Git Large File Storage (Git LFS)**.  
+This repository contains large example data files that are managed using **Git Large File Storage (Git LFS)**.  
 When cloning or pushing this repository—especially from a remote server—
 please ensure that Git LFS is installed and properly configured in your environment.
 
