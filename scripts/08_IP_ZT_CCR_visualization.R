@@ -1,6 +1,6 @@
 ###########################################
-# Script name : 07_IP_ZT_pairwise_IID_plot.R
-# Description : Visualize pairwise inter-individual distance (IID) across Zeitgeber Time (ZT) with hourly and light/dark summaries
+# Script name : 08_IP_ZT_CCR_visualization.R
+# Description : Visualize pairwise close contact ratio (CCR) across Zeitgeber Time (ZT) with hourly and light/dark summaries
 # Authors     : Shohei Ochi, Masashi Azuma
 # Version history:
 #   v1.1 - 2025-01-20 - Shohei Ochi, Masashi Azuma
@@ -12,16 +12,24 @@ library(dplyr)
 library(ggplot2)
 
 # --- Interactive file selection ---
-cat("▶ Please select the file (ZT_converted_Hourly_IID.xlsx)\n")
+cat("▶ Please select the file (ZT_converted_Hourly_CCR.xlsx)\n")
 file_path <- file.choose()
 cat("▶ Selected file:", file_path, "\n")
 
 # --- Load data ---
 data <- read_excel(file_path)
 
-# --- Extract numeric ZT and Day ---
+# --- Safety checks / column normalization ---
+required_cols <- c("ID_1", "ID_2", "ZT_Label", "CCR")
+missing_cols <- setdiff(required_cols, names(data))
+if (length(missing_cols) > 0) {
+  stop("Missing required columns: ", paste(missing_cols, collapse = ", "))
+}
+
+# --- Ensure CCR is numeric and extract ZT / Day ---
 data <- data %>%
   mutate(
+    CCR  = as.numeric(CCR),
     Pair = paste(ID_1, ID_2, sep = "-"),
     ZT   = as.integer(sub(".*ZT", "", ZT_Label)),
     Day  = as.integer(sub("Day(\\d+).*", "\\1", ZT_Label))
@@ -45,7 +53,7 @@ palette_pair <- setNames(
 
 # --- Output directory ---
 file_base_dir <- dirname(file_path)
-out_dir <- file.path(file_base_dir, "IID")
+out_dir <- file.path(file_base_dir, "CCR")
 
 if (!dir.exists(out_dir)) {
   dir.create(out_dir, recursive = TRUE)
@@ -84,8 +92,8 @@ for (pair in unique_pairs) {
   label_indices <- df_plot$Index[df_plot$ZT %% label_interval == 0]
   label_texts   <- df_plot$ZT_Label[df_plot$ZT %% label_interval == 0]
   
-  # Plot hourly inter-individual distance
-  p <- ggplot(df_plot, aes(x = Index, y = Avg_Inter_Individual_Distance)) +
+  # Plot hourly CCR
+  p <- ggplot(df_plot, aes(x = Index, y = CCR)) +
     geom_rect(
       data = grey_blocks,
       aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
@@ -94,18 +102,18 @@ for (pair in unique_pairs) {
     geom_line(color = palette_pair[[pair]]) +
     geom_point(color = palette_pair[[pair]]) +
     scale_x_continuous(breaks = label_indices, labels = label_texts) +
-    scale_y_continuous(limits = c(0, 40)) +
+    scale_y_continuous(limits = c(0, 100)) +
     labs(
-      title = paste("Inter-Individual Distance -", pair),
+      title = paste("CCR -", pair),
       x = "Day and ZT",
-      y = "Average inter-individual distance (cm)"
+      y = "Close contact ratio (%)"
     ) +
     theme_minimal(base_size = 13) +
     theme(
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
   
-  save_png_pdf(p, paste0("IID_ZT_", pair), out_dir)
+  save_png_pdf(p, paste0("CCR_ZT_", pair), out_dir)
   
   # --- Calculate Light/Dark mean per day ---
   df_light_dark <- df_plot %>%
@@ -115,7 +123,7 @@ for (pair in unique_pairs) {
     ) %>%
     group_by(Day, LightDark, Period_Label) %>%
     summarise(
-      Avg_Inter_Individual_Distance_Mean = mean(Avg_Inter_Individual_Distance, na.rm = TRUE),
+      Avg_CCR_Mean = mean(CCR, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     mutate(LightDark_Order = ifelse(grepl("Light", Period_Label), 1, 2)) %>%
@@ -127,7 +135,7 @@ for (pair in unique_pairs) {
     mutate(LightDarkColor = ifelse(LightDark == "Light", "white", "grey80"))
   
   # Plot Light/Dark mean
-  p_ld <- ggplot(df_light_dark, aes(x = Index, y = Avg_Inter_Individual_Distance_Mean)) +
+  p_ld <- ggplot(df_light_dark, aes(x = Index, y = Avg_CCR_Mean)) +
     geom_rect(
       data = bg_blocks,
       aes(xmin = Index - 0.5, xmax = Index + 0.5, ymin = -Inf, ymax = Inf, fill = LightDarkColor),
@@ -137,11 +145,11 @@ for (pair in unique_pairs) {
     geom_line(color = palette_pair[[pair]]) +
     geom_point(color = palette_pair[[pair]]) +
     scale_x_continuous(breaks = df_light_dark$Index, labels = df_light_dark$Period_Label) +
-    scale_y_continuous(limits = c(0, 40)) +
+    scale_y_continuous(limits = c(0, 100)) +
     labs(
-      title = paste("Inter-Individual Distance -", pair),
+      title = paste("CCR -", pair),
       x = "Day and phase",
-      y = "Average inter-individual distance (cm)"
+      y = "Close contact ratio (%)"
     ) +
     theme_minimal(base_size = 13) +
     theme(
@@ -149,7 +157,7 @@ for (pair in unique_pairs) {
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
   
-  save_png_pdf(p_ld, paste0("IID_LightDarkMean_", pair), out_dir)
+  save_png_pdf(p_ld, paste0("CCR_LightDarkMean_", pair), out_dir)
   
   df_light_dark$Pair <- pair
   df_all_light_dark <- rbind(df_all_light_dark, df_light_dark)
@@ -178,7 +186,7 @@ zt_labels_all <- time_index_all %>%
 
 p_all_hr <- ggplot(
   data_all_hr,
-  aes(x = Index, y = Avg_Inter_Individual_Distance, color = factor(Pair), group = Pair)
+  aes(x = Index, y = CCR, color = factor(Pair), group = Pair)
 ) +
   geom_rect(
     data = grey_blocks_hr,
@@ -191,12 +199,12 @@ p_all_hr <- ggplot(
     breaks = zt_labels_all$Index,
     labels = zt_labels_all$ZT_Label
   ) +
-  scale_y_continuous(limits = c(0, 40)) +
+  scale_y_continuous(limits = c(0, 100)) +
   scale_color_manual(values = palette_pair) +
   labs(
-    title = "Inter-Individual Distance - All Pairs",
+    title = "CCR - All Pairs",
     x = "Day and ZT",
-    y = "Average inter-individual distance (cm)",
+    y = "Close contact ratio (%)",
     color = "Pair"
   ) +
   theme_minimal(base_size = 13) +
@@ -204,7 +212,7 @@ p_all_hr <- ggplot(
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
   )
 
-save_png_pdf(p_all_hr, "IID_ZT_AllPairs", out_dir)
+save_png_pdf(p_all_hr, "CCR_ZT_AllPairs", out_dir)
 
 # --- Generate combined Light/Dark summary plot (all pairs) ---
 bg_blocks_all <- df_all_light_dark %>%
@@ -213,7 +221,7 @@ bg_blocks_all <- df_all_light_dark %>%
 
 p_all_ld <- ggplot(
   df_all_light_dark,
-  aes(x = Index, y = Avg_Inter_Individual_Distance_Mean, color = factor(Pair), group = Pair)
+  aes(x = Index, y = Avg_CCR_Mean, color = factor(Pair), group = Pair)
 ) +
   geom_rect(
     data = bg_blocks_all,
@@ -224,12 +232,12 @@ p_all_ld <- ggplot(
   geom_line() +
   geom_point() +
   scale_x_continuous(breaks = bg_blocks_all$Index, labels = bg_blocks_all$Period_Label) +
-  scale_y_continuous(limits = c(0, 40)) +
+  scale_y_continuous(limits = c(0, 100)) +
   scale_color_manual(values = palette_pair) +
   labs(
-    title = "Inter-Individual Distance - All Pairs",
+    title = "CCR - All Pairs",
     x = "Day and phase",
-    y = "Average inter-individual distance (cm)",
+    y = "Close contact ratio (%)",
     color = "Pair"
   ) +
   theme_minimal(base_size = 13) +
@@ -237,4 +245,6 @@ p_all_ld <- ggplot(
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
   )
 
-save_png_pdf(p_all_ld, "IID_LightDarkMean_AllPairs", out_dir)
+save_png_pdf(p_all_ld, "CCR_LightDarkMean_AllPairs", out_dir)
+
+cat("\n✅ All done.\nOutput folder: ", out_dir, "\n", sep = "")

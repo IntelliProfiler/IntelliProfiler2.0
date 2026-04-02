@@ -1,5 +1,5 @@
 ###########################################
-# Script name : 06_IP_ZT_TD_plot.R
+# Script name : 06_IP_ZT_TD_visualization.R
 # Description : Visualize ZT-based travel distance (TD) data with hourly and light/dark phase summaries
 # Authors     : Shohei Ochi, Masashi Azuma
 # Version history:
