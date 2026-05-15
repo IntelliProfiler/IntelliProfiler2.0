@@ -1,17 +1,29 @@
 ###########################################
-# Script name : 19_IP_radar_chart.R
-# Description : Generate radar charts comparing behavioral metrics (TD, IID, CCR) between groups across light/dark phases and days
+# Script name : 19_IP_radar_chart_BH_split.R
+# Description : Generate radar charts comparing behavioral metrics (TD, IID, CCR)
+#               between Male and Female across light/dark phases and days.
+#               Welch's t-tests are followed by BH correction separately for:
+#               6 Day-average comparisons and 6 x Day1..DayN comparisons.
 # Authors     : Shohei Ochi, Masashi Azuma
 # Version history:
 #   v1.1 - 2025-01-20 - Shohei Ochi, Masashi Azuma
 #   v1.2 - 2026-03-31 - Shohei Ochi, Masashi Azuma
+#   v1.3 - 2026-04-30 - Add BH correction for Male vs Female comparisons by Masashi Azuma
+#   v1.4 - 2026-05-01 - Split BH correction into Day-average and Day-by-day families by Masashi Azuma
 ###########################################
 # ============================================================
 # Radar chart batch exporter (interactive Excel import)
-#  - 01 Day-average (selected input sheet, rmax=2.0) Male vs Female + stars
-#  - 02 Day1..DayN (selected input sheet, rmax=2.0) Male vs Female + stars
+#  - 01 Day-average (selected input sheet, rmax=2.0) Male vs Female + BH-adjusted stars
+#  - 02 Day1..DayN (selected input sheet, rmax=2.0) Male vs Female + BH-adjusted stars
 #  - 03 Day-average (within-sex Z -> min-shift, rmax=4.0) Male vs Female
 #  - 04 Day1..DayN (within-sex Z -> min-shift, rmax=4.0) Male vs Female
+#
+# Multiple testing correction:
+#  - Welch's t-test is performed for each of the six radar parameters.
+#  - For Male vs Female plots with significance stars, BH correction is applied separately across:
+#       01 Day-average: 6 parameters
+#       02 Day-by-day : 6 parameters x Day1..DayN
+#    For example, Day1..Day4 gives 6 p-values for Day-average and 24 p-values for Day-by-day.
 #
 # Output: transparent background PDF (vector)
 #
@@ -244,14 +256,122 @@ radar_plot_multi <- function(series_list, axis_labels_expr,
   dev.off()
 }
 
+# ---------- Male vs Female Welch + BH helpers ----------
+welch_p_by_vars <- function(dat_wide) {
+  p_raw <- setNames(rep(NA_real_, length(vars_order)), vars_order)
+  
+  for (v in vars_order) {
+    m <- dat_wide %>% filter(Sex == "Male")   %>% pull(.data[[v]]) %>% na.omit()
+    f <- dat_wide %>% filter(Sex == "Female") %>% pull(.data[[v]]) %>% na.omit()
+    
+    if (length(m) >= 2 && length(f) >= 2) {
+      p_raw[v] <- tryCatch(
+        t.test(m, f, var.equal = FALSE)$p.value,
+        error = function(e) NA_real_
+      )
+    }
+  }
+  
+  p_raw
+}
+
+make_bh_stars_dayavg_and_byday <- function(wide_data, days_use, adjust_method = "BH") {
+  # This function computes Welch's t-test p-values for:
+  #   01 Day-average: 6 parameters
+  #   02 Day-by-day : 6 parameters x number of days
+  #
+  # BH correction is applied separately to two families:
+  #   Family 1: Day-average only (6 comparisons)
+  #   Family 2: Day-by-day only (6 parameters x number of days; e.g., 24 comparisons for Day1..Day4)
+  
+  # ----- Family 1: Day-average, 6 comparisons -----
+  dayavg_by_id <- wide_data %>%
+    group_by(Sex, ID) %>%
+    summarise(across(all_of(vars_order), ~mean(.x, na.rm = TRUE)), .groups = "drop")
+  
+  p_dayavg <- welch_p_by_vars(dayavg_by_id)
+  p_dayavg_adj <- rep(NA_real_, length(p_dayavg))
+  valid_dayavg <- !is.na(p_dayavg)
+  p_dayavg_adj[valid_dayavg] <- p.adjust(p_dayavg[valid_dayavg], method = adjust_method)
+  names(p_dayavg_adj) <- names(p_dayavg)
+  
+  stars_dayavg <- setNames(rep("", length(vars_order)), vars_order)
+  for (v in vars_order) {
+    stars_dayavg[v] <- p_to_stars(p_dayavg_adj[[v]])
+  }
+  
+  p_table_dayavg <- tibble::tibble(
+    comparison_key = paste("DayAvg", vars_order, sep = "__"),
+    bh_family = "Day-average_6_comparisons",
+    panel = "DayAvg",
+    day = "DayAvg",
+    variable = vars_order,
+    p_raw = as.numeric(p_dayavg),
+    p_adj_BH = as.numeric(p_dayavg_adj),
+    stars = vapply(p_dayavg_adj, p_to_stars, character(1))
+  )
+  
+  # ----- Family 2: Day-by-day, 6 x Day comparisons -----
+  test_byday <- list()
+  
+  for (d in days_use) {
+    wd <- wide_data %>% filter(Day == d)
+    
+    by_id <- wd %>%
+      group_by(Sex, ID) %>%
+      summarise(across(all_of(vars_order), ~mean(.x, na.rm = TRUE)), .groups = "drop")
+    
+    p_d <- welch_p_by_vars(by_id)
+    for (v in vars_order) {
+      key <- paste(d, v, sep = "__")
+      test_byday[[key]] <- list(panel = "ByDay", day = d, variable = v, p_raw = p_d[[v]])
+    }
+  }
+  
+  p_byday <- vapply(test_byday, function(x) x$p_raw, numeric(1))
+  p_byday_adj <- rep(NA_real_, length(p_byday))
+  valid_byday <- !is.na(p_byday)
+  p_byday_adj[valid_byday] <- p.adjust(p_byday[valid_byday], method = adjust_method)
+  names(p_byday_adj) <- names(p_byday)
+  
+  stars_by_day <- list()
+  for (d in days_use) {
+    stars_d <- setNames(rep("", length(vars_order)), vars_order)
+    for (v in vars_order) {
+      key <- paste(d, v, sep = "__")
+      stars_d[v] <- p_to_stars(p_byday_adj[[key]])
+    }
+    stars_by_day[[d]] <- stars_d
+  }
+  
+  p_table_byday <- tibble::tibble(
+    comparison_key = names(p_byday),
+    bh_family = paste0("Day-by-day_", length(vars_order) * length(days_use), "_comparisons"),
+    panel = vapply(test_byday, function(x) x$panel, character(1)),
+    day = vapply(test_byday, function(x) x$day, character(1)),
+    variable = vapply(test_byday, function(x) x$variable, character(1)),
+    p_raw = as.numeric(p_byday),
+    p_adj_BH = as.numeric(p_byday_adj),
+    stars = vapply(p_byday_adj, p_to_stars, character(1))
+  )
+  
+  p_table <- dplyr::bind_rows(p_table_dayavg, p_table_byday)
+  
+  list(
+    stars_dayavg = stars_dayavg,
+    stars_by_day = stars_by_day,
+    p_table = p_table
+  )
+}
+
 # ---------- main ----------
 cat("▶ Please select the Excel file (radar_input.xlsx)\n")
 infile <- file.choose()
 
 # Choose one:
 # input_sheet <- "Radar_Input_MaleRef"
-# input_sheet <- "Radar_Input_MinMax_MaleRef"
-input_sheet <- "Radar_Input_MinMax_MaleRef"
+# input_sheet <- "Radar_Input_PhaseMinMax_MaleRef"
+input_sheet <- "Radar_Input_PhaseMinMax_MaleRef"
 
 cat("▶ Input sheet: ", input_sheet, "\n", sep = "")
 df <- readxl::read_excel(infile, sheet = input_sheet)
@@ -337,19 +457,6 @@ generate_color_by_index <- function(index) {
   hcl(h = h, c = c, l = l)
 }
 
-sig_stars <- function(dat_wide) {
-  out <- setNames(rep("", length(vars_order)), vars_order)
-  for (v in vars_order) {
-    m <- dat_wide %>% filter(Sex == "Male")   %>% pull(.data[[v]]) %>% na.omit()
-    f <- dat_wide %>% filter(Sex == "Female") %>% pull(.data[[v]]) %>% na.omit()
-    if (length(m) >= 2 && length(f) >= 2) {
-      p <- tryCatch(t.test(m, f, var.equal = FALSE)$p.value, error = function(e) NA_real_)
-      out[v] <- p_to_stars(p)
-    }
-  }
-  out
-}
-
 empty_stars <- setNames(rep("", length(vars_order)), vars_order)
 
 # ============================================================
@@ -399,6 +506,26 @@ dir.create(out_dir_00b, showWarnings = FALSE, recursive = TRUE)
 
 days_all  <- wide %>% distinct(Day) %>% pull(Day) %>% order_days()
 days_1to4 <- days_all[days_all %in% c("Day1", "Day2", "Day3", "Day4")]
+
+# ============================================================
+# Split BH correction for 01 Day-average and 02 Day-by-day
+# ============================================================
+bh_results <- make_bh_stars_dayavg_and_byday(
+  wide_data = wide,
+  days_use = days_1to4,
+  adjust_method = "BH"
+)
+
+stars_01 <- bh_results$stars_dayavg
+stars_02_all <- bh_results$stars_by_day
+
+# Optional CSV output for checking raw and BH-adjusted p-values.
+# This does not change the PDF output structure.
+write.csv(
+  bh_results$p_table,
+  file = file.path(out_dir, paste0("Male_vs_Female_Welch_BH_split_pvalues_", file_tag, ".csv")),
+  row.names = FALSE
+)
 
 for (d in days_1to4) {
   day_dir <- file.path(out_dir_00b, d)
@@ -478,8 +605,6 @@ dayavg_by_id <- wide %>%
   group_by(Sex, ID) %>%
   summarise(across(all_of(vars_order), ~mean(.x, na.rm = TRUE)), .groups = "drop")
 
-stars_01 <- sig_stars(dayavg_by_id)
-
 dayavg_sex <- dayavg_by_id %>%
   group_by(Sex) %>%
   summarise(across(all_of(vars_order), \(x) mean(x, na.rm = TRUE)), .groups = "drop")
@@ -537,7 +662,8 @@ for (d in days_1to4) {
     group_by(Sex, ID) %>%
     summarise(across(all_of(vars_order), \(x) mean(x, na.rm = TRUE)), .groups = "drop")
   
-  stars_d <- sig_stars(by_id)
+  stars_d <- stars_02_all[[d]]
+  if (is.null(stars_d)) stars_d <- empty_stars
   
   mean_sex <- by_id %>%
     group_by(Sex) %>%

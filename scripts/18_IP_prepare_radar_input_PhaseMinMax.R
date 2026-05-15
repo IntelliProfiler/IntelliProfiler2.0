@@ -1,10 +1,12 @@
 ###########################################
-# Script name : 18_IP_prepare_radar_input.R
-# Description : Integrate TD, IID, and CCR datasets, perform normalization (male reference and min-max scaling), and generate structured input tables for radar chart visualization
+# Script name : 18_IP_prepare_radar_input_PhaseMinMax.R
+# Description : Integrate TD, IID, and CCR datasets, perform normalization (male reference and phase-wise min-max scaling), and generate structured input tables for radar chart visualization
 # Authors     : Shohei Ochi, Masashi Azuma
 # Version history:
 #   v1.1 - 2025-01-20 - Shohei Ochi, Masashi Azuma
 #   v1.2 - 2026-03-31 - Shohei Ochi, Masashi Azuma
+#   v1.3 - 2026-05-01 - Phase-wise min-max scaling across Day1-4 within each Light/Dark phase by Masashi Azuma
+#   v1.4 - 2026-05-14 - Update safe_minmax() by Hitoshi Inada
 ###########################################
 suppressPackageStartupMessages({
   library(readxl)
@@ -52,14 +54,16 @@ assign_ld <- function(df) {
 # If max == min, return 0 for all values in the group
 safe_minmax <- function(x) {
   x <- as.numeric(x)
-  rng <- range(x, na.rm = TRUE)
-  if (any(is.infinite(rng)) || is.na(rng[1]) || is.na(rng[2])) {
+  x_min <- min(x, na.rm = TRUE)
+  x_max <- max(x, na.rm = TRUE)
+  
+  if (is.infinite(x_min) || is.infinite(x_max) || is.na(x_min) || is.na(x_max)) {
     return(rep(NA_real_, length(x)))
   }
-  if ((rng[2] - rng[1]) == 0) {
+  if ((x_max - x_min) == 0) {
     return(rep(0, length(x)))
   }
-  (x - rng[1]) / (rng[2] - rng[1])
+  (x - x_min) / (x_max - x_min)
 }
 
 ###########################################
@@ -252,12 +256,12 @@ radar_input_maleref <- radar_input_raw %>%
   arrange(Sex, ID, Day, LD)
 
 ###########################################
-# 2. Day-wise min-max scaling across all individuals
+# 2. Phase-wise min-max scaling across Day1-4 and all individuals
 #    followed by Male Day1-4 average = 1.0 normalization
 ###########################################
 
-radar_input_dayminmax <- radar_input_raw %>%
-  group_by(Day, LD) %>%
+radar_input_phaseminmax <- radar_input_raw %>%
+  group_by(LD) %>%
   mutate(
     `Travel dist`      = safe_minmax(`Travel dist`),
     `Inter-indiv dist` = safe_minmax(`Inter-indiv dist`),
@@ -266,7 +270,7 @@ radar_input_dayminmax <- radar_input_raw %>%
   ungroup() %>%
   arrange(Sex, ID, Day, LD)
 
-male_ref_dayminmax <- radar_input_dayminmax %>%
+male_ref_phaseminmax <- radar_input_phaseminmax %>%
   filter(Sex == "Male") %>%
   group_by(LD) %>%
   summarise(
@@ -276,8 +280,8 @@ male_ref_dayminmax <- radar_input_dayminmax %>%
     .groups = "drop"
   )
 
-radar_input_minmax_maleref <- radar_input_dayminmax %>%
-  left_join(male_ref_dayminmax, by = "LD") %>%
+radar_input_phaseminmax_maleref <- radar_input_phaseminmax %>%
+  left_join(male_ref_phaseminmax, by = "LD") %>%
   mutate(
     `Travel dist`      = `Travel dist` / ref_td,
     `Inter-indiv dist` = `Inter-indiv dist` / ref_iid,
@@ -290,10 +294,10 @@ radar_input_minmax_maleref <- radar_input_dayminmax %>%
 # Define output directory and file
 ###########################################
 
-output_dir <- file.path(dirname(file_male_td), "Radar_Input_Data")
+output_dir <- file.path(dirname(file_male_td), "Radar_Input_Data_PhaseMinMax")
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
-out_file <- file.path(output_dir, "radar_input.xlsx")
+out_file <- file.path(output_dir, "radar_input_phaseminmax.xlsx")
 
 ###########################################
 # Save output
@@ -303,9 +307,9 @@ write_xlsx(
   list(
     Radar_Input_Raw = radar_input_raw,
     Radar_Input_MaleRef = radar_input_maleref,
-    Radar_Input_MinMax_MaleRef = radar_input_minmax_maleref,
+    Radar_Input_PhaseMinMax_MaleRef = radar_input_phaseminmax_maleref,
     Male_Reference_Raw = male_ref,
-    Male_Reference_MinMax = male_ref_dayminmax,
+    Male_Reference_PhaseMinMax = male_ref_phaseminmax,
     TD = td_all,
     IID = iid_all,
     CCR = ccr_all,
@@ -323,5 +327,5 @@ cat("Output file:\n", out_file, "\n")
 cat("Saved sheets:\n")
 cat(" - Radar_Input_Raw\n")
 cat(" - Radar_Input_MaleRef\n")
-cat(" - Radar_Input_MinMax_MaleRef\n")
+cat(" - Radar_Input_PhaseMinMax_MaleRef\n")
 cat("========================================\n")
