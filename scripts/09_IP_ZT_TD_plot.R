@@ -117,7 +117,7 @@ aov_res_1h <- aov_res_1h %>%
 
 # Save anova result
 write.csv(aov_res_1h, 
-          file.path(out_dir, paste0("TD_ANOVA_TypeIII_1h_", Sys.Date(), ".csv")), 
+          file.path(out_dir, paste0("TD_TypeIII_1h_", Sys.Date(), ".csv")), 
           row.names = FALSE)
 
 
@@ -351,7 +351,7 @@ aov_res_12h <- aov_res_12h %>%
 
 # Save anova result
 write.csv(aov_res_12h, 
-          file.path(out_dir, paste0("TD_ANOVA_TypeIII_12h_", Sys.Date(), ".csv")), 
+          file.path(out_dir, paste0("TD_TypeIII_12h_", Sys.Date(), ".csv")), 
           row.names = FALSE)
 
 # Compare groups for each Period_Label

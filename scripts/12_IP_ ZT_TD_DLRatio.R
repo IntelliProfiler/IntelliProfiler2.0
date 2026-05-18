@@ -153,7 +153,7 @@ aov_res_ratio <- aov_res_ratio %>%
 
 write.csv(
   aov_res_ratio,
-  file.path(out_dir, "TD_DLR_ANOVA_TypeIII.csv"),
+  file.path(out_dir, "TD_DLR_TypeIII.csv"),
   row.names = FALSE
 )
 
