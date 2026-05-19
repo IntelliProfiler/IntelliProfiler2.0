@@ -119,7 +119,7 @@ aov_res_1h <- aov_res_1h %>%
     TRUE ~ ""
   ))
 
-# Save anova result
+# Save TupeⅢ result
 write.csv(aov_res_1h, 
           file.path(out_dir, paste0("CCR_TypeIII_1h_", Sys.Date(), ".csv")), 
           row.names = FALSE)
@@ -297,7 +297,7 @@ aov_res_12h <- aov_res_12h %>%
     TRUE ~ ""
   ))
 
-# Save anova result
+# Save TypeⅢ result
 write.csv(aov_res_12h, 
           file.path(out_dir, paste0("CCR_TypeIII_12h_", Sys.Date(), ".csv")), 
           row.names = FALSE)
