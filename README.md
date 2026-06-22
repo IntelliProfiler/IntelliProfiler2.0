@@ -59,16 +59,10 @@ IntelliProfiler2.0/
 ## 📝Citation
 If you use IntelliProfiler 2.0 in your research, please cite:
 ### IntelliProfiler 2.0 (current version)
-Ochi S#, Azuma M#, Hara I, Inada H, Takabayashi K, Osumi N  
-IntelliProfiler 2.0: An integrated R pipeline for long-term home-cage behavioral profiling in group-housed mice using eeeHive 2D  
-bioRxiv (2026)  
-https://www.biorxiv.org/content/10.64898/2026.02.10.705044v1
+Ochi S, Azuma M, Hara I, Inada H, Takabayashi K, Osumi N. IntelliProfiler 2.0: An integrated R pipeline for long-term home-cage behavioral profiling in group-housed mice using eeeHive 2D. Journal of Neuroscience Methods. 2026;433:110816. https://doi.org/10.1016/j.jneumeth.2026.110816
 
 ### Previous version (IntelliProfiler 1.0)
-Ochi S et al.  
-IntelliProfiler: a research workflow for analyzing multiple animals with a high-resolution home-cage RFID system  
-Lab Animal (2026)  
-https://www.nature.com/articles/s41684-025-01668-4
+Ochi S, Inada H, Osumi N. IntelliProfiler: a research workflow for analyzing multiple animals with a high-resolution home-cage RFID system. Lab Animal. 2026;55:48–63. https://doi.org/10.1038/s41684-025-01668-4
  
 ---
 ## 📜License
