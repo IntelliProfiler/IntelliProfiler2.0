@@ -5,6 +5,7 @@
 # Version history:
 #   v1.1 - 2025-01-20 - Shohei Ochi, Masashi Azuma
 #   v1.2 - 2026-03-31 - Shohei Ochi, Masashi Azuma
+#   v1.3 - 2026-11-01 - Clarify board positions and coordinate mapping
 ###########################################
 # install.packages(c("dplyr","tidyr","lubridate","doParallel","openxlsx","readr","purrr","foreach"))
 
@@ -88,22 +89,22 @@ df <- df %>%
 
 # --- C. Coordinate transformation ---
 # Board1: X = 1-6,  Y = 1-4
-# Board2: X = 7-12, Y = 1-4
-# Board3: X = 1-6,  Y = 5-8
+# Board2: X = 1-6,  Y = 5-8
+# Board3: X = 7-12, Y = 1-4
 # Board4: X = 7-12, Y = 5-8
 
 df <- df %>%
   mutate(
     X = case_when(
       Board == 1 ~ ((Position - 1) %% 6) + 1,
-      Board == 2 ~ 7 + ((24 - Position) %% 6),
-      Board == 3 ~ ((Position - 1) %% 6) + 1,
+      Board == 2 ~ ((Position - 1) %% 6) + 1,
+      Board == 3 ~ 7 + ((24 - Position) %% 6),
       Board == 4 ~ 7 + ((24 - Position) %% 6)
     ),
     Y = case_when(
       Board == 1 ~ 4 - floor((Position - 1) / 6),
-      Board == 2 ~ 4 - floor((24 - Position) / 6),
-      Board == 3 ~ 8 - floor((Position - 1) / 6),
+      Board == 2 ~ 8 - floor((Position - 1) / 6),
+      Board == 3 ~ 4 - floor((24 - Position) / 6),
       Board == 4 ~ 8 - floor((24 - Position) / 6)
     )
   )
